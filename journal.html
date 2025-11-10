@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ananya — Scrapbook Proposal (Seamless 3D Flip)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Satisfy&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --book-w:1000px; /* width */
+      --book-h:700px;  /* height */
+      --page-w:calc(var(--book-w) / 2);
+      --page-h:var(--book-h);
+      --spine-color:rgba(90,63,122,0.18);
+      --paper:#fffaf0; /* Slightly off-white for old paper feel */
+      --accent:#5a3f7a;
+      --romantic-red:#d84343;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:'Satisfy', cursive, Georgia, serif;background:#e7e3d8}
+    
+    /* Centering container */
+    .stage{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .book-container{
+      perspective:5000px; /* High perspective for maximum 3D feel */
+      width:var(--book-w);
+      height:var(--book-h);
+      position:relative;
+      transform-style:preserve-3d;
+    }
+    .book{
+      width:100%;height:100%;position:relative;transform-style:preserve-3d;display:flex;align-items:center;justify-content:center;box-shadow:0 30px 80px rgba(0,0,0,0.6);border-radius:8px;overflow:visible
+    }
+    
+    /* Wrapper for each spread (two pages) */
+    .spread {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform-style: preserve-3d;
+      transform-origin: left center; /* Rotation happens from the spine */
+      transition: transform 1.2s cubic-bezier(0.6, 0.05, 0.35, 0.95), box-shadow 1.2s; 
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    }
+
+    /* Creates the illusion of the page curling and overlapping */
+    .spread.flipped {
+      transform: rotateY(-180deg);
+      z-index: 5;
+      /* Shadow simulates the thickness/curl of the paper turning over */
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5), 
+                  inset 20px 0 50px -15px rgba(0,0,0,0.5); 
+    }
+
+    /* Add a white 'back' to the flipping spread to represent the back of the turning page (the right half) */
+    .spread::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 50%; /* This covers the space where the right half is */
+        height: 100%;
+        background-color: var(--paper); /* The color of the back of the paper */
+        transform: rotateY(180deg) translateZ(1px); /* Rotate to the back of the spread and move slightly forward */
+        backface-visibility: hidden;
+        z-index: 100; /* Ensure this is on top of the pages below */
+        box-shadow: inset 10px 0 30px -5px rgba(0,0,0,0.2); /* Shadow on the spine side of the turning half's back */
+    }
+    /* Hide the back element when the spread is flipped */
+    .spread.flipped::after {
+        display: none;
+    }
+
+    /* Left and right halves */
+    .page{
+      width:var(--page-w);
+      height:var(--page-h);
+      position:absolute;top:0;
+      background:var(--paper);
+      overflow:hidden;padding:28px;
+      backface-visibility:hidden; 
+      display:flex;flex-direction:column;justify-content:flex-start;
+      border-radius: 2px;
+    }
+    .page.left-half{
+        left:0;
+        transform-origin:right center;
+        z-index: 2; 
+        position: relative; 
+    }
+    .page.right-half{
+        right:0;
+        left:auto;
+        transform-origin:left center;
+        z-index: 1; 
+        cursor: e-resize;
+    } 
+
+    /* When spread is flipped, the left half should not rotate internally */
+    .spread.flipped .page.left-half{
+      transform: rotateY(0deg); 
+    }
+
+    /* Media Container */
+    .media{
+      flex:1 1 60%;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap
+    }
+    
+    /* --- TAPE AND FRAME STYLES (UPDATED FOR CORNER TAPE) --- */
+    .photo-wrapper {
+        position: relative; /* Essential for absolute tape positioning */
+        display: inline-block; /* Wraps tightly around the image */
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4); /* Shadow for the photo itself */
+        border: 10px solid #fff; /* White photo frame border */
+        margin: 20px; /* Space for the corner tape outside the frame */
+        transition: transform 0.3s;
+    }
+    .photo-wrapper:hover {
+        transform: scale(1.03) !important; /* Scale up slightly on hover */
+    }
+
+    /* Tape Pseudo-Elements (Corner pieces) */
+    .photo-wrapper:before, .photo-wrapper:after {
+        content: '';
+        position: absolute;
+        width: 30px; 
+        height: 30px; 
+        background: rgba(255, 255, 255, 0.9); /* Papery white with slight opacity */
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); 
+        z-index: 10;
+    }
+
+    /* Tape Piece 1 (Top-Left) */
+    .photo-wrapper:before {
+        top: -15px; 
+        left: -15px;
+        transform: rotate(-5deg); /* Random rotation */
+    }
+
+    /* Tape Piece 2 (Bottom-Right) */
+    .photo-wrapper:after {
+        bottom: -15px;
+        right: -15px;
+        transform: rotate(7deg); /* Different random rotation */
+    }
+
+    /* Style the image/video inside the wrapper */
+    .photo-wrapper > img, .photo-wrapper > video {
+        border: none;
+        box-shadow: none;
+        margin: 0;
+        max-width: 100%;
+        max-height: 100%;
+        height: auto;
+        transform: none !important; 
+        display: block; 
+    }
+    /* Ensure the two-image layout still works */
+    .media .two{display:flex;gap:12px;align-items:center;justify-content:center;width:100%}
+    .media .two .photo-wrapper{width:48%;}
+    /* ---------------------------------- */
+
+
+    .text{
+      flex:1 1 40%;padding:18px 22px;display:flex;flex-direction:column;gap:12px;color:#333
+    }
+    /* Apply Dancing Script to titles */
+    .date-header{
+        font-family: 'Dancing Script', cursive;
+        color:var(--accent);
+        font-size:32px;
+        font-weight:600;
+        margin-bottom:6px;
+        border-bottom:2px dashed #a88be4;
+        padding-bottom:6px;
+        text-shadow: 1px 1px 0 rgba(255,255,255,0.7); 
+    }
+    .page-header{
+        font-family: 'Dancing Script', cursive;
+        font-size:38px;
+        color:var(--romantic-red);
+        text-align:center;
+        font-style:normal;
+    }
+    .story-text{
+        line-height:1.6;
+        font-size:20px; 
+        font-family: 'Satisfy', cursive, Georgia, serif;
+    }
+    .confession{background:#fcf6ff;border-left:5px solid var(--romantic-red);padding:12px;font-style:normal}
+    .final-moment{background:#ffecf2;border:3px dashed var(--romantic-red);padding:24px;border-radius:8px;text-align:center; box-shadow: 0 4px 10px rgba(0,0,0,0.1);}
+    .final-moment .date-header{
+        font-size: 48px; 
+        color: var(--romantic-red);
+    }
+
+    /* Page number positioning */
+    .page-number{position:absolute;right:16px;bottom:12px;color:#999;font-size:12px}
+    .page.left-half .page-number{right:auto; left:16px;} /* Move left half numbers to the left side */
+
+    /* Cover styling */
+    .cover{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,#5a3f7a 0%,#a88be4 100%);padding:30px}
+    .cover h1{font-family: 'Dancing Script', cursive; font-size:64px;letter-spacing:2px;margin-bottom:10px}
+    .cover p{font-family: 'Satisfy', cursive, Georgia, serif; font-size:28px;font-style:normal}
+
+    /* Back-turn clickable area */
+    .back-turn{position:absolute;top:0;left:0;width:12%;height:12%;cursor:w-resize;z-index:100}
+
+    /* Responsive scaling */
+    @media (max-width:1100px){:root{--book-w:900px;--book-h:630px}}
+    @media (max-width:900px){:root{--book-w:640px;--book-h:480px}}
+
+    /* Buttons for navigation on small screens */
+    .controls{position:fixed;right:20px;bottom:20px;display:flex;gap:8px}
+    .btn{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer;box-shadow:0 6px 12px rgba(0,0,0,0.15)}
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="book-container">
+      <div class="book" id="book">
+        
+        <div class="spread" data-index="0">
+          <div class="page left-half cover">
+            <h1>Our Story</h1>
+            <p>For Ananya</p>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">💌 August 19, 2025 — The Match</div>
+              <div class="story-text">We matched on **Hinge** on August 19th. You were supposed to be "just a match." I said I wouldn't catch feelings. I was so, so wrong. </div>
+            </div>
+            <div class="media">
+              <div class="photo-wrapper" style="transform: rotate(1deg);">
+                <img src="hinge.PNG" alt="Hinge screenshot" style="max-height:360px;width:auto"/>
+              </div>
+            </div>
+            <div class="page-number">1</div>
+          </div>
+        </div>
+
+        <div class="spread" data-index="1">
+          <div class="page left-half">
+            <div class="media">
+              <div class="photo-wrapper" style="transform: rotate(3deg);">
+                <img src="1.JPG" alt="Got Tea" />
+              </div>
+            </div>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">🎳 August 23, 2025 — First Date: When I Knew</div>
+              <div class="story-text">We went bowling which I lost intentionally this one, you have to agree with, followed by the café Got Tea. I generally don’t like taking photos, but somehow, I didn't mind taking this polaroid with you. The amount of fun I had that day made me certain that you are just too good to be true. I just knew you are the one. The funny thing was you weren't even fully present after you got the call from home. The fact you gave me a chance even when I didn't drop you home so late at night and you still gave me a second date—thank you for that.</div>
+            </div>
+            <div class="page-number">2</div>
+          </div>
+        </div>
+
+        <div class="spread" data-index="2">
+          <div class="page left-half">
+            <div class="media">
+              <div class="photo-wrapper" style="transform: rotate(-2deg);">
+                <img src="2.JPG" alt="Escape Room"/>
+              </div>
+            </div>
+            <div class="page-number">3</div>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">🗝️ August 29, 2025 — Second Date: The Dustbin</div>
+              <div class="story-text">The escape room was the most fun I've ever had, even though we didn't get out of the room. I had more fun solving it than any other time I went there. The real highlight? Later at MKT, you'd eat a little of whatever we bought and pass the rest to me. I actually loved that you were treating me as your **personal dustbin**.</div>
+            </div>
+            <div class="page-number">3</div>
+          </div>
+        </div>
+
+        <div class="spread" data-index="3">
+          <div class="page left-half">
+            <div class="media">
+              <div class="photo-wrapper" style="transform: rotate(-1deg);">
+                <video controls playsinline style="max-height:540px; width:auto">
+                    <source src="/3.MP4" type="video/mp4" />
+                    Your browser doesn't support the video tag.
+                  </video>
+              </div>
+            </div>
+            <div class="page-number"></div>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">👻 September 14, 2025 — Third Date: Too Scared to Bully</div>
+              <div class="story-text">We watched *The Conjuring*. I planned to scare you, but you were already so terrified, you were already so far into your chair so I thought, "ok, let's not do any further damage." I had more fun watching you get scared than the movie! Later, whatever we were planning fell apart—tried go-karting (too much of a line), tried a restaurant (couldn't find one). I was getting really worried you might be frustrated, but when I looked at you, I realized none of it was irritating you, and I was just amazed. You are just **too good, absolutely perfect**. P.S. We finally ended up eating a very random McDonald's.</div>
+            </div>
+            <div class="page-number">4</div>
+          </div>
+        </div>
+
+        <div class="spread" data-index="4">
+          <div class="page left-half">
+            <div class="media">
+              <div class="two">
+                <div class="photo-wrapper" style="transform: rotate(-3deg);">
+                    <img src="4_1.png" alt="Lilo & Stitch"/>
+                </div>
+                <div class="photo-wrapper" style="transform: rotate(2deg);">
+                    <img src="4_2.JPG" alt="Arcade"/>
+                </div>
+              </div>
+            </div>
+            <div class="page-number"></div>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">🧸 September 29, 2025 — Fourth Date: Claw Machine Happiness</div>
+               <div class="story-text">We watched *Lilo and Stitch* (still incomplete!) and you beat me unfairly at air hockey (you know my score was not going up, I hit more of them than you, you have to agree). Meeting your friends at Galaxy Pizza made me so tense—I was biting my nails constantly. But even in my awkward state, just looking at how happy you were about me putting in this effort made it all worth it. Later, you beat me in that bike race game unfairly again (you know I drove perfectly). Then, I won the bear from the claw machine on my first try! The happiness on your face made me so happyyyy.</div>
+            </div>
+            <div class="page-number">5</div>
+          </div>
+        </div>
+
+        <div class="spread" data-index="5">
+          <div class="page left-half">
+            <div class="media">
+              <div class="photo-wrapper" style="transform: rotate(4deg);">
+                <img src="5.png" alt="Shinchan movie"/>
+              </div>
+            </div>
+            <div class="page-number"></div>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">😴 October 5, 2025 — Fifth Date: Sleep vs. Me</div>
+               <div class="story-text">You came to see the Shinchan movie after clubbing the whole night. Knowing how much you value sleep, I was so **honoured** you chose to spend the day with me. You were tired and had a headache, but you tried so hard not to let it ruin the date. That effort was so cuteee. (Also, you finally told me you kinda liked me on October 9th!)</div>
+            </div>
+            <div class="media">
+                <div class="photo-wrapper" style="transform: rotate(-2deg);">
+                    <img src="screenshot.PNG" alt="Shinchan movie" style="max-height:240px;width:auto"/>
+                </div>
+              </div>
+            <div class="page-number">6</div>
+          </div>
+        </div>
+
+        <div class="spread" data-index="6">
+          <div class="page left-half">
+            <div class="text">
+              <div class="date-header">🎬 October 13, 2025 — Sixth Date, Part 1</div>
+               <div class="story-text">We were supposed to come to my home on the 13th because the 14th is my birthday. We started watching your favorite movie, *Five Feet Apart* (also incomplete, what is it with our movies?). I had so much fun **making coffee with you**. </div>
+            </div>
+            <div class="page-number"></div>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">🎂 October 14, 2025 — My Best Birthday Ever, Part 2</div>
+               <div class="story-text">Your thoughtful gifts made me cry—the little things you noticed and got me were amazing. The highlight of my night was when you just **hugged me and slept** while I was massaging you. You told me, "Now I like you". Best. Birthday. Ever.</div>
+            </div>
+            <div class="page-number">7</div>
+          </div>
+        </div>
+
+        <div class="spread" data-index="7">
+          <div class="page left-half">
+            <div class="media">
+              <div class="photo-wrapper" style="transform: rotate(2deg);">
+                <img src="7.png" alt="Go-karting"/>
+              </div>
+            </div>
+            <div class="page-number"></div>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">🏁 October 17, 2025 — The Requirement</div>
+               <div class="story-text">We went go-karting where I let you win (for the betterment of both of us, since you drive rashly when you’re losing!), then to Theos (my favorite!). Then we went to another mystery room—why do we go to so many of them, we are not even that smart! At the end of the date I was sad knowing I wouldn't see you for two weeks. But as you were leaving you saw my sadness and finally said, "**Ok, we are in a relationship right now, but I expect a proper proposal**." I will never forget these wordsss, neverrr. This whole journal is the proper proposal!</div>
+            </div>
+            <div class="page-number">8</div>
+          </div>
+        </div>
+
+        <div class="spread" data-index="8">
+          <div class="page left-half">
+            <div class="media">
+              <div class="two">
+                <div class="photo-wrapper" style="transform: rotate(-1deg);">
+                    <img src="8.JPG" alt="MKT selfie"/>
+                </div>
+                <div class="photo-wrapper" style="transform: rotate(5deg);">
+                    <img src="8.png" alt="Polaroid"/>
+                </div>
+              </div>
+            </div>
+            <div class="page-number"></div>
+          </div>
+          <div class="page right-half">
+            <div class="text">
+              <div class="date-header">💋 November 2, 2025 — Eighth Date: The Kiss Trade</div>
+               <div class="story-text">You chose me over sleep again after clubbing! I tickled you for three hours to get back at you for your relentless bullying. You made the absurd offer: a kiss on my cheek to stop the tickling. I gave up an embarrassing photo of you for that kiss (this is why I wanted that photo, by the way, this journal is the reason why). I was so shy receiving itttt that I knew I was gonna turn red that’s why I just ran from your flat afte that! </div>
+            </div>
+            <div class="page-number">9</div>
+          </div>
+        </div>
+        
+        <div class="spread" data-index="9">
+            <div class="page left-half cover" style="background: linear-gradient(135deg, var(--romantic-red) 0%, #ff6b8b 100%);">
+              <h1 style="font-size: 80px;">So, Ananya...</h1>
+              <div class="page-number"></div>
+            </div>
+            <div class="page right-half">
+                <div class="text" style="justify-content: center; height: 100%;">
+                    <div class="final-moment">
+                        <div class="page-header" style="color: var(--accent);">Let’s see where this goes...</div>
+                        <div class="story-text" style="font-size: 24px; margin: 20px 0; color: #333;">
+                        But for now, I know I'm already head-over-heels over you.
+                        </div>
+                        <div class="date-header" style="font-size: 48px; margin-top: 30px; border-bottom: none;">
+                        Will you be my girlfriend?
+                        </div>
+                    </div>
+                </div>
+                <div class="page-number">10</div>
+            </div>
+        </div>
+
+
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="prevBtn">◀ Prev</button>
+    <button class="btn" id="nextBtn">Next ▶</button>
+  </div>
+
+  <script>
+    const spreads = Array.from(document.querySelectorAll('.spread'));
+    let idx = 0;
+    const total = spreads.length;
+
+    function updateZ() {
+      spreads.forEach((s,i)=>{
+        // Stacking spreads from back to front
+        s.style.zIndex = (total - i) + (i<=idx?100:0);
+      });
+    }
+
+    function next(){
+      if(idx >= spreads.length - 1) return;
+      spreads[idx].classList.add('flipped');
+      idx++;
+      updateZ();
+    }
+    function prev(){
+      if(idx <= 0) return;
+      idx--;
+      spreads[idx].classList.remove('flipped');
+      updateZ();
+    }
+
+    document.getElementById('nextBtn').addEventListener('click',next);
+    document.getElementById('prevBtn').addEventListener('click',prev);
+
+    // Click handler for page navigation
+    document.querySelectorAll('.spread').forEach(s=>{
+      
+      // 1. Back turn logic (top-left corner of the left half)
+      const back = document.createElement('div');
+      back.className='back-turn';
+      back.addEventListener('click',(e)=>{e.stopPropagation(); prev();});
+      s.appendChild(back);
+      
+      // 2. Forward turn logic (clicking the visible right half)
+      const rightHalf = s.querySelector('.page.right-half');
+      if (rightHalf) {
+          rightHalf.addEventListener('click', (e) => {
+              // Ensure we don't flip if we click the page number or an interactive element
+              if (e.target.closest('a') || e.target.closest('button') || e.target.closest('video') || e.target.closest('.photo-wrapper')) {
+                return; // Prevent flip if clicking on the photo wrapper itself
+              }
+              e.stopPropagation(); 
+              next();
+          });
+      }
+    });
+
+    // init
+    updateZ();
+
+    // keyboard nav
+    document.addEventListener('keydown', (e)=>{ if(e.key === 'ArrowRight') next(); if(e.key === 'ArrowLeft') prev(); });
+  </script>
+</body>
+</html>
